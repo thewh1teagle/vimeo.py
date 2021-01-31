@@ -9,88 +9,93 @@ from tusclient import client
 from queue import Queue
 
 
-class Stream_upload:
+# class Stream_upload:
     
-    UPLOAD_ENDPOINT = '/me/videos'
-    VERSIONS_ENDPOINT = '{video_uri}/versions'
-    DEFAULT_CHUNK_SIZE = (50 * 1024 * 1024)  # 50 MB
+#     UPLOAD_ENDPOINT = '/me/videos'
+#     VERSIONS_ENDPOINT = '{video_uri}/versions'
+#     DEFAULT_CHUNK_SIZE = (50 * 1024 * 1024)  # 50 MB
     
-    def __init__(self, file_size):
-        self.file_size = file_size
-        self.tus_client = client.TusClient('https://files.tus.vimeo.com')
-        self.uploader = self.tus_client.stream_uploader()
-    def upload_chunk(chunk):
-        raise NotImplementedError
+#     def __init__(self, file_size):
+#         self.file_size = file_size
+#         self.tus_client = client.TusClient('https://files.tus.vimeo.com')
+#         self.uploader = self.tus_client.stream_uploader()
+#     def upload_chunk(chunk):
+#         raise NotImplementedError
 
 
-    def upload(self, filename, **kwargs):
+#     def upload(self, filename, **kwargs):
 
-        uri = self.UPLOAD_ENDPOINT
-        data = kwargs['data'] if 'data' in kwargs else {}
+#         uri = self.UPLOAD_ENDPOINT
+#         data = kwargs['data'] if 'data' in kwargs else {}
 
-        # Is a `chunk_size` specified? Use default value if not.
-        proposed_or_default_chunk_size = data.get('chunk_size', self.DEFAULT_CHUNK_SIZE)
-        # For efficiency, lets ensure the pending chunk_size does not result in too many cycles
-        chunk_size = self.apply_chunk_size_rules(proposed_or_default_chunk_size, filesize)
+#         # Is a `chunk_size` specified? Use default value if not.
+#         proposed_or_default_chunk_size = data.get('chunk_size', self.DEFAULT_CHUNK_SIZE)
+#         # For efficiency, lets ensure the pending chunk_size does not result in too many cycles
+#         chunk_size = self.apply_chunk_size_rules(proposed_or_default_chunk_size, filesize)
 
-        # Ignore any specified upload approach and size.
-        if 'upload' not in data:
-            data['upload'] = {
-                'approach': 'tus',
-                'size': filesize
-            }
-        else:
-            data['upload']['approach'] = 'tus'
-            data['upload']['size'] = filesize
+#         # Ignore any specified upload approach and size.
+#         if 'upload' not in data:
+#             data['upload'] = {
+#                 'approach': 'tus',
+#                 'size': filesize
+#             }
+#         else:
+#             data['upload']['approach'] = 'tus'
+#             data['upload']['size'] = filesize
 
-        attempt = self.post(uri, data=data, params={'fields': 'uri,upload'})
-        if attempt.status_code != 200:
-            raise exceptions.UploadAttemptCreationFailure(
-                attempt,
-                "Unable to initiate an upload attempt."
-            )
+#         attempt = self.post(uri, data=data, params={'fields': 'uri,upload'})
+#         if attempt.status_code != 200:
+#             raise exceptions.UploadAttemptCreationFailure(
+#                 attempt,
+#                 "Unable to initiate an upload attempt."
+#             )
 
-        attempt = attempt.json()
+#         attempt = attempt.json()
 
-        return self.__perform_tus_upload(filename, attempt, chunk_size=chunk_size)
-
-
+#         return self.__perform_tus_upload(filename, attempt, chunk_size=chunk_size)
 
 
 
-    def __perform_tus_upload(self, filename, attempt, chunk_size=DEFAULT_CHUNK_SIZE):
-        """Take an upload attempt and perform the actual upload via tus.
-        https://tus.io/
 
-        Args:
-            filename (string): name of the video file on vimeo.com
-            attempt (:obj): requests object
-            chunk_size (int): size of each chunk. defaults to DEFAULT_CHUNK_SIZE
 
-        Returns:
-            string: The Vimeo Video URI of your uploaded video.
+#     def __perform_tus_upload(self, filename, attempt, chunk_size=DEFAULT_CHUNK_SIZE):
+#         """Take an upload attempt and perform the actual upload via tus.
+#         https://tus.io/
 
-        Raises:
-            VideoUploadFailure: If unknown errors occured when uploading your
-                video.
-        """
-        upload_link = attempt.get('upload').get('upload_link')
+#         Args:
+#             filename (string): name of the video file on vimeo.com
+#             attempt (:obj): requests object
+#             chunk_size (int): size of each chunk. defaults to DEFAULT_CHUNK_SIZE
 
-        try:
-            tus_client = client.TusClient('https://files.tus.vimeo.com')
-            uploader = tus_client.stream_uploader(
-                file_size=
-                file_stream=fs,
-                retries=3,
-                url=upload_link)
-            uploader.upload()
-        except Exception as e:
-            raise exceptions.VideoUploadFailure(
-                e,
-                'Unexpected error when uploading through tus.'
-            )
+#         Returns:
+#             string: The Vimeo Video URI of your uploaded video.
 
-        return attempt.get('uri')
+#         Raises:
+#             VideoUploadFailure: If unknown errors occured when uploading your
+#                 video.
+#         """
+#         upload_link = attempt.get('upload').get('upload_link')
+
+#         # try:
+#         #     tus_client = client.TusClient('https://files.tus.vimeo.com')
+#         #     uploader = tus_client.stream_uploader(
+#         #         file_size=
+#         #         file_stream=fs,
+#         #         retries=3,
+#         #         url=upload_link)
+#         #     uploader.upload()
+#         # except Exception as e:
+#         #     raise exceptions.VideoUploadFailure(
+#         #         e,
+#         #         'Unexpected error when uploading through tus.'
+#         #     )
+
+#         # return attempt.get('uri')
+
+
+
+
+
 
 
 
@@ -106,11 +111,41 @@ class UploadVideoMixin:
 
 
 
-    def dynamic_bytes_upload(self):
-        pass
+    def manual_chunks_upload(self, file_name, file_size, chunks_size, **kwargs):
+        data = kwargs['data'] if 'data' in kwargs else {}
+        if 'upload' not in data:
+            data['upload'] = {
+                'approach': 'tus',
+                'size': file_size
+            }
+        else:
+            data['upload']['approach'] = 'tus'
+            data['upload']['size'] = file_size
+
+        uri = self.UPLOAD_ENDPOINT
+
+        attempt = self.post(uri, data=data, params={'fields': 'uri,upload'})
+        if attempt.status_code != 200:
+            raise exceptions.UploadAttemptCreationFailure(
+                attempt,
+                "Unable to initiate an upload attempt."
+            )
+
+        attempt = attempt.json()
+
+        upload_link = attempt.get('upload').get('upload_link')
+
+        try:
+            tus_client = client.TusClient('https://files.tus.vimeo.com')
+            return tus_client.manual_chunks_uploader(file_size=file_size, retries=3, url=upload_link)
+        except Exception as e:
+            raise exceptions.VideoUploadFailure(
+                e,
+                'Unexpected error when uploading through tus.'
+            )
 
 
-    def advanced_upload(self, filename, buffer, **kwargs):
+    def in_memory_upload(self, filename, buffer, **kwargs):
         filesize = buffer.getbuffer().nbytes
         uri = self.UPLOAD_ENDPOINT
         data = kwargs['data'] if 'data' in kwargs else {}
@@ -139,10 +174,12 @@ class UploadVideoMixin:
 
         attempt = attempt.json()
 
-        return self.advanced_tus_upload(buffer, attempt, chunk_size=chunk_size)
+        return self.in_memory_tus_upload(buffer, attempt, chunk_size=chunk_size)
 
 
-    def advanced_tus_upload(self, buffer, attempt, chunk_size=DEFAULT_CHUNK_SIZE):
+
+
+    def in_memory_tus_upload(self, buffer, attempt, chunk_size=DEFAULT_CHUNK_SIZE):
         upload_link = attempt.get('upload').get('upload_link')
         try:
             tus_client = client.TusClient('https://files.tus.vimeo.com')
